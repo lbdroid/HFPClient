@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="tk.rabidbeaver.hfpclient">
+
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_STACK" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.RECEIVE_BLUETOOTH_MAP" />
+    <uses-permission android:name="android.permission.ACCESS_BLUETOOTH_AVRCP_CT_DATA" />
+
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/bt_share"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+
+        <uses-library android:name="javax.obex" />
+
+        <activity
+            android:label="Blue Main"
+            android:taskAffinity="org.codeaurora.bluetooth.bttestapp.MainActivity"
+            android:name="org.codeaurora.bluetooth.bttestapp.MainActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize" >
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <receiver android:name=".NotificationSetupReceiver" >
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
+
+        <!--activity android:name="org.codeaurora.bluetooth.bttestapp.VcardFilterActivity" /-->
+        <activity
+            android:label="Blue Dialer"
+            android:icon="@mipmap/ic_launcher_phone"
+            android:taskAffinity="org.codeaurora.bluetooth.bttestapp.HfpTestActivity"
+            android:name="org.codeaurora.bluetooth.bttestapp.HfpTestActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <service android:name=".HFPNotificationService" />
+        <activity
+            android:label="Blue Music"
+            android:icon="@drawable/app_music"
+            android:taskAffinity="org.codeaurora.bluetooth.bttestapp.AvrcpTestActivity"
+            android:name="org.codeaurora.bluetooth.bttestapp.AvrcpTestActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <!--activity
+            android:name=".PbapTestActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:launchMode="singleTop" /-->
+        <!--activity
+            android:name=".MapTestActivity"
+            android:configChanges="orientation|keyboardHidden|screenSize"
+            android:launchMode="singleTop" /-->
+        <!--activity android:name="org.codeaurora.bluetooth.bttestapp.MessageFilterActivity" /-->
+
+        <service android:name="org.codeaurora.bluetooth.bttestapp.ProfileService" />
+
+
+    </application>
+
+</manifest>
