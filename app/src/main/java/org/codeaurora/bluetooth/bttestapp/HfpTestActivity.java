@@ -350,7 +350,7 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
 
         ActivityHelper.initialize(this, R.layout.activity_hfp_test);
         BluetoothConnectionReceiver.registerObserver(this);
-        mCalls = new Hashtable<Integer, BluetoothHeadsetClientCall>();
+        mCalls = new Hashtable<>();
 
         // bind to app service
         Intent intent = new Intent(this, ProfileService.class);

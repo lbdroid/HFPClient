@@ -31,6 +31,8 @@ import wrapper.android.bluetooth.BluetoothHeadsetClientCall;
 public class HFPNotificationService extends Service {
     private final String TAG = "HFPNotificationService";
 
+    private static boolean undestroyed = true;
+
     private static Notification notification;
     BluetoothDevice mDevice;
     BluetoothHeadsetClient mBluetoothHeadsetClient;
@@ -55,44 +57,59 @@ public class HFPNotificationService extends Service {
             Log.d(TAG, "mHfpClientReceiver running onReceive");
             String action = intent.getAction();
 
-            if (action.equals(BluetoothHeadsetClient.ACTION_CONNECTION_STATE_CHANGED)) {
-
-                int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
-
-                switch (state) {
-                    case BluetoothProfile.STATE_CONNECTED:
-                        updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
-
-                        connected = true;
-                        break;
-                    case BluetoothProfile.STATE_DISCONNECTED:
-                        connected = false;
-                        break;
+            if (!isConnected()){
+                Log.d(TAG, "Received HFP broadcast, but unable to process");
+                if (mBluetoothHeadsetClient == null) Log.d(TAG, "hfpClient is NULL");
+                if (mBluetoothHeadsetClient.hfpClientInstance == null) Log.d(TAG, "hfpClientInstance is NULL");
+                if (mDevice == null) Log.d(TAG, "device is NULL");
+                try {
+                    if (mBluetoothHeadsetClient.getConnectionState(mDevice) != BluetoothProfile.STATE_CONNECTED)
+                        Log.d(TAG, "device is not connected as HFP client");
+                } catch (NullPointerException npe){
+                    Log.d(TAG, "unknown connection state");
                 }
+                return;
+            }
 
-            } else if (action.equals(BluetoothHeadsetClient.ACTION_AG_EVENT)) {
-                Bundle params = intent.getExtras();
-                forceUpdateAgEvents(params, false);
-
-            } else if (action.equals(BluetoothHeadsetClient.ACTION_CALL_CHANGED)) {
-                updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
-            } else if (action.equals(BluetoothHeadsetClient.ACTION_AUDIO_STATE_CHANGED)) {
-
-                // I don't like putting application specific hacks here, but this is a very specific and very simple
-                // broadcast. If the receiver for this broadcast doesn't exist, then it just doesn't do anything.
-                Log.d(TAG, "AUDIO_STATE_CHANGED");
-                int astate = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
-                if (astate == BluetoothHeadsetClient.STATE_AUDIO_CONNECTED){
-                    Intent i = new Intent();
-                    i.setAction("tk.rabidbeaver.bd37033controller.PHONE_ON");
-                    sendBroadcast(i);
-                    audioConnected = true;
-                } else if (astate != BluetoothHeadsetClient.STATE_AUDIO_CONNECTING){
-                    Intent i = new Intent();
-                    i.setAction("tk.rabidbeaver.bd37033controller.PHONE_OFF");
-                    sendBroadcast(i);
-                    audioConnected = false;
-                }
+            switch (action){
+                case BluetoothHeadsetClient.ACTION_CONNECTION_STATE_CHANGED:
+                    int state = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
+                    switch (state) {
+                        case BluetoothProfile.STATE_CONNECTED:
+                            updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
+                            connected = true;
+                            break;
+                        case BluetoothProfile.STATE_DISCONNECTED:
+                            connected = false;
+                            break;
+                    }
+                    break;
+                case BluetoothHeadsetClient.ACTION_AG_EVENT:
+                    Bundle params = intent.getExtras();
+                    forceUpdateAgEvents(params, false);
+                    break;
+                case BluetoothHeadsetClient.ACTION_CALL_CHANGED:
+                    updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
+                    break;
+                case BluetoothHeadsetClient.ACTION_AUDIO_STATE_CHANGED:
+                    // I don't like putting application specific hacks here, but this is a very specific and very simple
+                    // broadcast. If the receiver for this broadcast doesn't exist, then it just doesn't do anything.
+                    Log.d(TAG, "AUDIO_STATE_CHANGED");
+                    int astate = intent.getIntExtra(BluetoothProfile.EXTRA_STATE, 0);
+                    if (astate == BluetoothHeadsetClient.STATE_AUDIO_CONNECTED){
+                        Intent i = new Intent();
+                        i.setAction("tk.rabidbeaver.bd37033controller.PHONE_ON");
+                        sendBroadcast(i);
+                        audioConnected = true;
+                    } else if (astate != BluetoothHeadsetClient.STATE_AUDIO_CONNECTING){
+                        Intent i = new Intent();
+                        i.setAction("tk.rabidbeaver.bd37033controller.PHONE_OFF");
+                        sendBroadcast(i);
+                        audioConnected = false;
+                    }
+                    break;
+                default:
+                    Log.d(TAG, "unhandled ACTION: "+action);
             }
 
             showNotification();
@@ -102,6 +119,15 @@ public class HFPNotificationService extends Service {
 
     private void updateAllCalls(List<BluetoothHeadsetClientCall> calls){
         totalCalls = 0;
+
+        if (calls == null || calls.size() == 0) {
+            onCall = false;
+            callNumber = "";
+            callId = 0;
+            ringingNumber = "";
+            ringing = false;
+            return;
+        }
 
         for (BluetoothHeadsetClientCall call : calls) {
             Log.v(TAG, "Updating call controls");
@@ -137,25 +163,39 @@ public class HFPNotificationService extends Service {
     }
 
     private void forceUpdateAgEvents(Bundle params, boolean notify){
-        for (String param : params.keySet()) {
-            if (param.equals(BluetoothHeadsetClient.EXTRA_IN_BAND_RING)) {
-                // this feature seems to be for the phone to play *its own* ringtone on the HFP client.
-                // We probably don't need to worry about it.
-                //in_band_ring = params.getInt(param, -1) > 0;
-            } else if (param.equals(BluetoothHeadsetClient.EXTRA_OPERATOR_NAME)) {
-                //operator =  params.getString(param);
-            } else if (param.equals(BluetoothHeadsetClient.EXTRA_NETWORK_STATUS)) {
-                cellConnected = params.getInt(param, -1) > 0;
-            } else if (param.equals(BluetoothHeadsetClient.EXTRA_NETWORK_ROAMING)) {
-                roaming = params.getInt(param, -1) > 0 ;
-            } else if (param.equals(BluetoothHeadsetClient.EXTRA_NETWORK_SIGNAL_STRENGTH)) {
-                sigStrength = params.getInt(param, -1);
-            } else if (param.equals(BluetoothHeadsetClient.EXTRA_BATTERY_LEVEL)) {
-                cellBattery = params.getInt(param, -1);
-            } else if (param.equals(BluetoothHeadsetClient.EXTRA_SUBSCRIBER_INFO)) {
-                //subscriber = params.getString(param);
+        if (params == null){
+            cellConnected = false;
+            roaming = false;
+            sigStrength = -1;
+            cellBattery = 0;
+        } else for (String param : params.keySet()) {
+            switch(param){
+                case BluetoothHeadsetClient.EXTRA_IN_BAND_RING:
+                    Log.d(TAG, "EXTRA_IN_BAND_RING");
+                    break;
+                case BluetoothHeadsetClient.EXTRA_OPERATOR_NAME:
+                    Log.d(TAG, "EXTRA_OPERATOR_NAME");
+                    break;
+                case BluetoothHeadsetClient.EXTRA_NETWORK_STATUS:
+                    cellConnected = params.getInt(param, -1) > 0;
+                    break;
+                case BluetoothHeadsetClient.EXTRA_NETWORK_ROAMING:
+                    roaming = params.getInt(param, -1) > 0 ;
+                    break;
+                case BluetoothHeadsetClient.EXTRA_NETWORK_SIGNAL_STRENGTH:
+                    sigStrength = params.getInt(param, -1);
+                    break;
+                case BluetoothHeadsetClient.EXTRA_BATTERY_LEVEL:
+                    cellBattery = params.getInt(param, -1);
+                    break;
+                case BluetoothHeadsetClient.EXTRA_SUBSCRIBER_INFO:
+                    Log.d(TAG, "EXTRA_SUBSCRIBER_INFO");
+                    break;
+                default:
+                    Log.d(TAG, "Unexpected AG EXTRA: "+param);
             }
         }
+
         if (notify){
             showNotification();
             ((NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
@@ -169,17 +209,13 @@ public class HFPNotificationService extends Service {
             mProfileService = ((ProfileService.LocalBinder) service).getService();
             mBluetoothHeadsetClient = mProfileService.getHfpClient();
 
-            if (mDevice != null) {
-                int connState = mBluetoothHeadsetClient.getConnectionState(mDevice);
-
-                if (connState == BluetoothProfile.STATE_CONNECTED) {
-                    updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
-                }
-
+            if (isConnected()) {
+                updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
                 forceUpdateAgEvents(mBluetoothHeadsetClient.getCurrentAgEvents(mDevice), true);
+            } else {
+                updateAllCalls(null);
+                forceUpdateAgEvents(null, true);
             }
-            showNotification();
-            ((NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
         }
 
         @Override
@@ -187,10 +223,17 @@ public class HFPNotificationService extends Service {
             mProfileService = null;
             mBluetoothHeadsetClient = null;
 
-            showNotification();
-            ((NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
+            updateAllCalls(null);
+            forceUpdateAgEvents(null, true);
         }
     };
+
+    private boolean isConnected(){
+        return (mDevice != null
+                && mBluetoothHeadsetClient != null
+                && mBluetoothHeadsetClient.hfpClientInstance != null
+                && mBluetoothHeadsetClient.getConnectionState(mDevice) == BluetoothProfile.STATE_CONNECTED);
+    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -198,15 +241,15 @@ public class HFPNotificationService extends Service {
         if (intent.getAction() == null) {
             showNotification();
             startForeground(17111, notification);
-        } else if (intent.getAction().contentEquals("accept")) {
+        } else if (isConnected() && intent.getAction().contentEquals("accept")) {
             mBluetoothHeadsetClient.acceptCall(mDevice, BluetoothHeadsetClient.CALL_ACCEPT_NONE);
             showNotification();
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
-        } else if (intent.getAction().contentEquals("reject")) {
+        } else if (isConnected() && intent.getAction().contentEquals("reject")) {
             mBluetoothHeadsetClient.rejectCall(mDevice);
             showNotification();
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
-        } else if (intent.getAction().contentEquals("hangup")) {
+        } else if (isConnected() && intent.getAction().contentEquals("hangup")) {
             mBluetoothHeadsetClient.terminateCall(mDevice, intent.getIntExtra("ID", 0));
             showNotification();
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
@@ -249,7 +292,8 @@ public class HFPNotificationService extends Service {
         hangupIntent.putExtra("ID", callId);
         PendingIntent hangupPIntent = PendingIntent.getService(this, 0, hangupIntent, 0);
 
-        //TODO: I'm getting signal strengths as high as 5, might be 1-5 instead of 0-4?
+        //TODO: Signal strength coming from bluetooth is in the range of 0-5, but our
+        // TODO graphics only apply to the range 0-4.
         Log.d(TAG, "SIGNAL STRENGTH: "+sigStrength);
 
         if (sigStrength > 4) sigStrength = 4;
@@ -310,22 +354,76 @@ public class HFPNotificationService extends Service {
         filter.addAction(BluetoothHeadsetClient.ACTION_LAST_VTAG);
         registerReceiver(mHfpClientReceiver, filter);
 
-        if (mBluetoothHeadsetClient != null) {
+        if (isConnected()) {
             updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
         } else {
             Log.v(TAG,"mBluetoothHeadsetClient is null");
         }
+
+        undestroyed = true;
+        new Thread(new Runnable(){
+            public void run(){
+                while (undestroyed) {
+                    try {
+                        Thread.sleep(10000);
+                        checkConn();
+                    } catch (InterruptedException ie) {
+                        ie.printStackTrace();
+                    }
+                }
+            }
+        }).start();
     }
 
+    private void checkConn(){
+        if (mProfileService != null){
+            boolean reloadNotification = false;
+            if (mDevice == null){
+                String prefDevice = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString(MainActivity.PREF_DEVICE, null);
+                BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
+                Set<BluetoothDevice> devices = ba.getBondedDevices();
+                if (devices != null) {
+                    for (BluetoothDevice device : devices) {
+                        if (prefDevice != null && device != null && device.getAddress() != null && prefDevice.equals(device.getAddress())) {
+                            mDevice = device;
+                            break;
+                        }
+                    }
+                }
+                if (mDevice == null){
+                    Log.d(TAG, "checkConn: unable to obtain device, bailing out");
+                    return;
+                }
+                mProfileService.setDevice(mDevice);
+                reloadNotification = true;
+            }
 
-    /* TODO: We need to come up with a bluetooth device.
-     * The way we are going to do this is like so;
-     * 1) Set a receiver for BluetoothAdapter.STATE_ON and STATE_OFF and STATE_CONNECTED and STATE_DISCONNECTED where latter two are
-     *    -- per the specific device we want connected.
-     * 2) If the adapter is ON then we;
-     *     a) loop check mBluetoothHeadsetClient.getConnectionState(mDevice) to make sure that we are actually connected to HFP.
-     *     b) if we are not connected, call mBluetoothHeadsetClient.connect(mDevice).
-     *
-     *
-     */
+            if (mBluetoothHeadsetClient == null) {
+                mBluetoothHeadsetClient = mProfileService.getHfpClient();
+                reloadNotification = true;
+            } else if (mBluetoothHeadsetClient.hfpClientInstance == null) {
+                Log.d(TAG, "checkConn: UNEXPECTED: ProfileService received a null Proxy in mHfpServiceListener.onServiceConnected(...)");
+            } else if (mBluetoothHeadsetClient.getConnectionState(mDevice) != BluetoothProfile.STATE_CONNECTED
+                    && mBluetoothHeadsetClient.getConnectionState(mDevice) != BluetoothProfile.STATE_CONNECTING) {
+                mBluetoothHeadsetClient.connect(mDevice);
+                reloadNotification = true;
+            }
+
+            if (reloadNotification && isConnected()){
+                updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
+                forceUpdateAgEvents(mBluetoothHeadsetClient.getCurrentAgEvents(mDevice), true);
+            } else if (reloadNotification){
+                updateAllCalls(null);
+                forceUpdateAgEvents(null, true);
+            }
+        } else {
+            Log.d(TAG, "checkConn: mProfileService is null");
+        }
+    }
+
+    @Override
+    public void onDestroy(){
+        undestroyed = false;
+        super.onDestroy();
+    }
 }
