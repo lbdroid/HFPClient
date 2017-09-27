@@ -80,6 +80,7 @@ public class HFPNotificationService extends Service {
                             connected = true;
                             break;
                         case BluetoothProfile.STATE_DISCONNECTED:
+                            // This case DOES NOT fire when bluetooth is shut off.
                             connected = false;
                             break;
                     }
@@ -195,6 +196,12 @@ public class HFPNotificationService extends Service {
                     Log.d(TAG, "Unexpected AG EXTRA: "+param);
             }
         }
+
+        if (mBluetoothHeadsetClient != null
+                && mDevice != null
+                && mBluetoothHeadsetClient.getConnectionState(mDevice) == BluetoothProfile.STATE_CONNECTED)
+            connected = true;
+        else connected = false;
 
         if (notify){
             showNotification();
