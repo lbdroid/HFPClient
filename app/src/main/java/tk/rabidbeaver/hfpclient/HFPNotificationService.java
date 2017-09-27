@@ -48,6 +48,7 @@ public class HFPNotificationService extends Service {
     private String callNumber = "";
     private int callId = 0;
     private boolean ringing = false;
+    private long ringingHoldover = 0;
     private boolean audioConnected = false;
     int totalCalls = 0;
 
@@ -242,6 +243,20 @@ public class HFPNotificationService extends Service {
                 && mBluetoothHeadsetClient.getConnectionState(mDevice) == BluetoothProfile.STATE_CONNECTED);
     }
 
+    private void connectAudio(){
+        if (isConnected())
+            while (mBluetoothHeadsetClient.getAudioState(mDevice) != BluetoothHeadsetClient.STATE_AUDIO_CONNECTED
+                    && (ringingHoldover > System.currentTimeMillis() - 10000 || onCall)) {
+                if (mBluetoothHeadsetClient.getAudioState(mDevice) != BluetoothHeadsetClient.STATE_AUDIO_CONNECTING)
+                    mBluetoothHeadsetClient.connectAudio();
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ie){
+                    ie.printStackTrace();
+                }
+            }
+    }
+
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "onStartCommand");
@@ -249,7 +264,11 @@ public class HFPNotificationService extends Service {
             showNotification();
             startForeground(17111, notification);
         } else if (isConnected() && intent.getAction().contentEquals("accept")) {
+            ringingHoldover = System.currentTimeMillis();
+            showNotification();
+            ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
             mBluetoothHeadsetClient.acceptCall(mDevice, BluetoothHeadsetClient.CALL_ACCEPT_NONE);
+            connectAudio();
             showNotification();
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
         } else if (isConnected() && intent.getAction().contentEquals("reject")) {
@@ -319,7 +338,9 @@ public class HFPNotificationService extends Service {
                 .setSmallIcon(getResources().getIdentifier(signalIcon, "drawable", this.getPackageName()))
                 .setContentIntent(phonePIntent)
                 .setOngoing(true);
-        if (ringing && !onCall) {
+        // For ringingHoldover check, stop the notification sound if answer button was pressed
+        // within last 15 seconds. No need to torment the user.
+        if (ringing && !onCall && ringingHoldover < System.currentTimeMillis() + 15000) {
             builder.setContentTitle("INCOMING: "+ringingNumber);
             builder.addAction(android.R.drawable.ic_media_play, "Accept", acceptPIntent);
             builder.addAction(android.R.drawable.ic_media_pause, "Reject", rejectPIntent);
