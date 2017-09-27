@@ -272,6 +272,9 @@ public class HFPNotificationService extends Service {
             showNotification();
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
         } else if (isConnected() && intent.getAction().contentEquals("reject")) {
+            ringingHoldover = System.currentTimeMillis();
+            showNotification();
+            ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
             mBluetoothHeadsetClient.rejectCall(mDevice);
             showNotification();
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
