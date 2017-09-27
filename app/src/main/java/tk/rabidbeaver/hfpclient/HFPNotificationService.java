@@ -198,11 +198,8 @@ public class HFPNotificationService extends Service {
             }
         }
 
-        if (mBluetoothHeadsetClient != null
-                && mDevice != null
-                && mBluetoothHeadsetClient.getConnectionState(mDevice) == BluetoothProfile.STATE_CONNECTED)
-            connected = true;
-        else connected = false;
+        connected = (mBluetoothHeadsetClient != null && mDevice != null
+                && mBluetoothHeadsetClient.getConnectionState(mDevice) == BluetoothProfile.STATE_CONNECTED);
 
         if (notify){
             showNotification();
@@ -345,17 +342,17 @@ public class HFPNotificationService extends Service {
         // within last 15 seconds. No need to torment the user.
         if (ringing && !onCall && ringingHoldover < System.currentTimeMillis() + 15000) {
             builder.setContentTitle("INCOMING: "+ringingNumber);
-            builder.addAction(android.R.drawable.ic_media_play, "Accept", acceptPIntent);
-            builder.addAction(android.R.drawable.ic_media_pause, "Reject", rejectPIntent);
+            builder.addAction(R.drawable.ic_call_white_48dp, "Accept", acceptPIntent);
+            builder.addAction(R.drawable.ic_call_end_white_48dp, "Reject", rejectPIntent);
             builder.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE));
             builder.setPriority(Notification.PRIORITY_MAX);
         } else if (ringing){
-            builder.addAction(android.R.drawable.ic_media_play, "Accept", acceptPIntent);
-            builder.addAction(android.R.drawable.ic_media_pause, "Reject", rejectPIntent);
+            builder.addAction(R.drawable.ic_call_white_48dp, "Accept", acceptPIntent);
+            builder.addAction(R.drawable.ic_call_end_white_48dp, "Reject", rejectPIntent);
             builder.setPriority(Notification.PRIORITY_MAX);
             builder.setContentText("INCOMING: "+ringingNumber);
         } else if (onCall){
-            builder.addAction(android.R.drawable.ic_media_play, "Hangup", hangupPIntent);
+            builder.addAction(R.drawable.ic_call_end_white_48dp, "Hangup", hangupPIntent);
             builder.setContentText("Call with: "+callNumber);
         }
 
