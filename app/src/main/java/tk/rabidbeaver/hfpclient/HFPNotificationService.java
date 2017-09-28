@@ -55,7 +55,7 @@ public class HFPNotificationService extends Service {
     private final BroadcastReceiver mHfpClientReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            Log.d(TAG, "mHfpClientReceiver running onReceive");
+            Log.d(TAG, "mHfpClientReceiver running onReceive, ACTION: "+intent.getAction());
             String action = intent.getAction();
 
             if (!isConnected()){
@@ -91,7 +91,7 @@ public class HFPNotificationService extends Service {
                     forceUpdateAgEvents(params, false);
                     break;
                 case BluetoothHeadsetClient.ACTION_CALL_CHANGED:
-                    updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice));
+                    if (!updateAllCalls(mBluetoothHeadsetClient.getCurrentCalls(mDevice))) return;
                     break;
                 case BluetoothHeadsetClient.ACTION_AUDIO_STATE_CHANGED:
                     // I don't like putting application specific hacks here, but this is a very specific and very simple
@@ -119,20 +119,25 @@ public class HFPNotificationService extends Service {
         }
     };
 
-    private void updateAllCalls(List<BluetoothHeadsetClientCall> calls){
-        totalCalls = 0;
+    private boolean updateAllCalls(List<BluetoothHeadsetClientCall> calls){
+        int o_totalCalls = totalCalls;
+        boolean o_onCall = onCall;
+        String o_callNumber = callNumber;
+        int o_callId = callId;
+        String o_ringingNumber = ringingNumber;
+        boolean o_ringing = ringing;
 
-        if (calls == null || calls.size() == 0) {
-            onCall = false;
-            callNumber = "";
-            callId = 0;
-            ringingNumber = "";
-            ringing = false;
-            return;
-        }
+        totalCalls = 0;
+        onCall = false;
+        callNumber = "";
+        callId = 0;
+        ringingNumber = "";
+        ringing = false;
+
+        if (calls == null || calls.size() == 0) return true;
 
         for (BluetoothHeadsetClientCall call : calls) {
-            Log.v(TAG, "Updating call controls");
+            Log.v(TAG, "Updating call controls, call state: "+call.getState());
             int state = call.getState();
             switch(state){
                 case BluetoothHeadsetClientCall.CALL_STATE_ACTIVE:
@@ -162,6 +167,13 @@ public class HFPNotificationService extends Service {
                     break;
             }
         }
+
+        return (o_totalCalls != totalCalls
+                || o_onCall != onCall
+                || o_callId != callId
+                || o_ringing != ringing
+                || !o_callNumber.contentEquals(callNumber)
+                || !o_ringingNumber.contentEquals(ringingNumber));
     }
 
     private void forceUpdateAgEvents(Bundle params, boolean notify){
@@ -256,7 +268,7 @@ public class HFPNotificationService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "onStartCommand");
+        Log.d(TAG, "onStartCommand, ACTION: "+intent.getAction());
         if (intent.getAction() == null) {
             showNotification();
             startForeground(17111, notification);
@@ -337,27 +349,38 @@ public class HFPNotificationService extends Service {
                 .setContentText("BT:"+(connected?1:0)+",BAT:"+cellBattery+",AUD:"+(audioConnected?1:0))
                 .setSmallIcon(getResources().getIdentifier(signalIcon, "drawable", this.getPackageName()))
                 .setContentIntent(phonePIntent)
+                .setSound(null)
                 .setOngoing(true);
         // For ringingHoldover check, stop the notification sound if answer button was pressed
         // within last 15 seconds. No need to torment the user.
-        if (ringing && !onCall && ringingHoldover < System.currentTimeMillis() + 15000) {
+        Log.d(TAG, "ringing: "+ringing+", onCall: "+onCall+", ringingHoldover: "+ringingHoldover+", System.currentTimeMillis():"+System.currentTimeMillis());
+        if (ringing && !onCall && ringingHoldover < System.currentTimeMillis() - 15000) {
+            Log.d(TAG, "Set notification: RINGING");
             builder.setContentTitle("INCOMING: "+ringingNumber);
             builder.addAction(R.drawable.ic_call_white_48dp, "Accept", acceptPIntent);
             builder.addAction(R.drawable.ic_call_end_white_48dp, "Reject", rejectPIntent);
             builder.setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE));
             builder.setPriority(Notification.PRIORITY_MAX);
         } else if (ringing){
+            Log.d(TAG, "Set notification: INCOMING, NOT RINGING");
             builder.addAction(R.drawable.ic_call_white_48dp, "Accept", acceptPIntent);
             builder.addAction(R.drawable.ic_call_end_white_48dp, "Reject", rejectPIntent);
             builder.setPriority(Notification.PRIORITY_MAX);
             builder.setContentText("INCOMING: "+ringingNumber);
         } else if (onCall){
+            Log.d(TAG, "Set notification: ON CALL");
             builder.addAction(R.drawable.ic_call_end_white_48dp, "Hangup", hangupPIntent);
             builder.setContentText("Call with: "+callNumber);
+        } else {
+            Log.d(TAG, "Set notification: NORMAL");
+            builder.setPriority(Notification.PRIORITY_DEFAULT);
         }
 
         notification = builder.build();
         if (ringing) notification.flags = Notification.FLAG_INSISTENT;
+
+        stopForeground(true);
+        startForeground(17111, notification);
     }
 
     @Override
