@@ -572,14 +572,14 @@ public class ServicesFragment extends ListFragment {
             }
         }
 
-        prefs.putString(MainActivity.PREF_SERVICES, json.toString());
+        prefs.putString("services", json.toString());
 
         prefs.commit();
     }
 
     public void restoreServices() {
         String str = getActivity().getPreferences(Context.MODE_PRIVATE).getString(
-                MainActivity.PREF_SERVICES, null);
+                "services", null);
 
         if (str == null) {
             return;

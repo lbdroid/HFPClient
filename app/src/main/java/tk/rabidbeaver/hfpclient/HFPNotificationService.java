@@ -19,7 +19,6 @@ import android.os.IBinder;
 import android.util.Log;
 
 import org.codeaurora.bluetooth.bttestapp.HfpTestActivity;
-import org.codeaurora.bluetooth.bttestapp.MainActivity;
 import org.codeaurora.bluetooth.bttestapp.ProfileService;
 
 import java.util.List;
@@ -278,6 +277,7 @@ public class HFPNotificationService extends Service {
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
             mBluetoothHeadsetClient.acceptCall(mDevice, BluetoothHeadsetClient.CALL_ACCEPT_NONE);
             connectAudio();
+            btAudioReset();
             showNotification();
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
         } else if (isConnected() && intent.getAction().contentEquals("reject")) {
@@ -293,7 +293,7 @@ public class HFPNotificationService extends Service {
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
         } else if (intent.getAction().contentEquals("load")) {
             // Get a hold on our preferred DEVICE:
-            String prefDevice = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString(MainActivity.PREF_DEVICE, null);
+            String prefDevice = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString("device", null);
             BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
             Set<BluetoothDevice> devices = ba.getBondedDevices();
             if (devices != null) {
@@ -426,11 +426,35 @@ public class HFPNotificationService extends Service {
         }).start();
     }
 
+    private void btAudioReset(){
+        new Thread(new Runnable(){
+            public void run(){
+                try {
+                    Thread.sleep(2500);
+                    if (isConnected() && !audioConnected){
+                        Log.d(TAG, "Fail to connect audio, resetting Bluetooth");
+                        BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+                        mBluetoothAdapter.disable();
+                        while (mBluetoothAdapter.getState() != BluetoothAdapter.STATE_OFF) Thread.sleep(50);
+                        mBluetoothAdapter.enable();
+                        while (mBluetoothAdapter.getState() != BluetoothAdapter.STATE_ON) Thread.sleep(50);
+                        while (!isConnected()){
+                            checkConn();
+                            Thread.sleep(50);
+                        }
+                    }
+                } catch (InterruptedException ie) {
+                    ie.printStackTrace();
+                }
+            }
+        }).start();
+    }
+
     private void checkConn(){
         if (mProfileService != null){
             boolean reloadNotification = false;
             if (mDevice == null){
-                String prefDevice = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString(MainActivity.PREF_DEVICE, null);
+                String prefDevice = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString("device", null);
                 BluetoothAdapter ba = BluetoothAdapter.getDefaultAdapter();
                 Set<BluetoothDevice> devices = ba.getBondedDevices();
                 if (devices != null) {

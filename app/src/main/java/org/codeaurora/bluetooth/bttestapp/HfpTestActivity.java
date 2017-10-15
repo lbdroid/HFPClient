@@ -301,7 +301,7 @@ public class HfpTestActivity extends MonkeyActivity implements IBluetoothConnect
             mBluetoothHeadsetClient = mProfileService.getHfpClient();
 
             // TODO: This is "ok". Requires setting the preferred device in the MainActivity, then
-            String addr = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString(MainActivity.PREF_DEVICE, null);
+            String addr = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString("device", null);
             try {
                 mDevice = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(addr);
             } catch (IllegalArgumentException e) {}

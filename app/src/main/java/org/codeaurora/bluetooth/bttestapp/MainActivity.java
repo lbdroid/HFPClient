@@ -61,9 +61,6 @@ public class MainActivity extends MonkeyActivity {
 
     private final String TAG = "MainActivity";
 
-    public static final String PREF_DEVICE = "device";
-    public static final String PREF_SERVICES = "services";
-
     public static final String PICKER_ACTION = "android.bluetooth.devicepicker.action.LAUNCH";
     public static final String PICKER_SELECTED = "android.bluetooth.devicepicker.action.DEVICE_SELECTED";
 
@@ -208,7 +205,7 @@ public class MainActivity extends MonkeyActivity {
 
         Log.v(TAG, "onStart");
 
-        String addr = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString(PREF_DEVICE, null);
+        String addr = getSharedPreferences("bluetoothDevices", MODE_PRIVATE).getString("device", null);
 
         try {
             BluetoothDevice dev = BluetoothAdapter.getDefaultAdapter().getRemoteDevice(addr);
@@ -329,7 +326,7 @@ public class MainActivity extends MonkeyActivity {
             name.setText(R.string.blank);
             addr.setText(R.string.blank);
 
-            prefs.remove(PREF_DEVICE);
+            prefs.remove("device");
         } else {
             Intent intent = new Intent(BluetoothConnectionReceiver.ACTION_NEW_BLUETOOTH_DEVICE);
             intent.putExtra(BluetoothConnectionReceiver.EXTRA_DEVICE_ADDRESS, device.getAddress());
@@ -338,7 +335,7 @@ public class MainActivity extends MonkeyActivity {
             name.setText(device.getName());
             addr.setText(device.getAddress());
 
-            prefs.putString(PREF_DEVICE, device.getAddress());
+            prefs.putString("device", device.getAddress());
 
             Intent service = new Intent(getApplicationContext(), HFPNotificationService.class);
             service.setAction("load");
