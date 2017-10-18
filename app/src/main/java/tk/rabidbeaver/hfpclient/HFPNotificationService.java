@@ -252,6 +252,7 @@ public class HFPNotificationService extends Service {
     }
 
     private void connectAudio(){
+        int i=0;
         if (isConnected())
             while (mBluetoothHeadsetClient.getAudioState(mDevice) != BluetoothHeadsetClient.STATE_AUDIO_CONNECTED
                     && (ringingHoldover > System.currentTimeMillis() - 10000 || onCall)) {
@@ -262,6 +263,7 @@ public class HFPNotificationService extends Service {
                 } catch (InterruptedException ie){
                     ie.printStackTrace();
                 }
+                if (i++ > 10) break;
             }
     }
 
@@ -277,7 +279,7 @@ public class HFPNotificationService extends Service {
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
             mBluetoothHeadsetClient.acceptCall(mDevice, BluetoothHeadsetClient.CALL_ACCEPT_NONE);
             connectAudio();
-            btAudioReset();
+            //btAudioReset();
             showNotification();
             ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).notify(17111, notification);
         } else if (isConnected() && intent.getAction().contentEquals("reject")) {
@@ -426,7 +428,7 @@ public class HFPNotificationService extends Service {
         }).start();
     }
 
-    private void btAudioReset(){
+    /*private void btAudioReset(){
         new Thread(new Runnable(){
             public void run(){
                 try {
@@ -448,7 +450,7 @@ public class HFPNotificationService extends Service {
                 }
             }
         }).start();
-    }
+    }*/
 
     private void checkConn(){
         if (mProfileService != null){
